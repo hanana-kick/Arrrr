@@ -29,6 +29,19 @@ android {
     packaging { resources.excludes += "/META-INF/{AL2.0,LGPL2.1}" }
 }
 
+// Keep expected/actual values visible in CI, even when report artifacts cannot be opened.
+tasks.withType<Test>().configureEach {
+    outputs.upToDateWhen { false }
+    outputs.cacheIf { false }
+    testLogging {
+        events("passed", "skipped", "failed")
+        exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+        showExceptions = true
+        showCauses = true
+        showStackTraces = true
+    }
+}
+
 dependencies {
     implementation(platform("androidx.compose:compose-bom:2026.09.00"))
     androidTestImplementation(platform("androidx.compose:compose-bom:2026.09.00"))
