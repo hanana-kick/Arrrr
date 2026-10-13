@@ -6,7 +6,7 @@ Kotlin + Jetpack Compose 기반 Android 애플리케이션입니다.
 
 - Android Studio (Android Gradle Plugin 9.4 지원 버전)
 - JDK 17
-- Android SDK 37 / Build Tools 36.0.0
+- Android SDK Platform 37.0 / Build Tools 36.0.0
 - Gradle 9.6.1 (Wrapper)
 
 ## 프로젝트 설정
@@ -28,7 +28,7 @@ Android Studio에서 저장소 디렉터리를 열고 Gradle 동기화 후 `app`
 | 앱 이름 | Arrrr |
 | Application ID | `com.hananakick.arrrr` |
 | 최소 SDK | API 26 (Android 8.0) |
-| 컴파일 / 타깃 SDK | API 37 (Android 17) |
+| 컴파일 / 타깃 SDK | API 37.0 / API 37 (Android 17) |
 | UI | Jetpack Compose + Material 3 |
 | 빌드 | AGP 9.4.0 · Gradle 9.6.1 |
 
