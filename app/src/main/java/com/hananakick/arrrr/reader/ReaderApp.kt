@@ -31,7 +31,7 @@ import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.RssFeed
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Badge
-import androidx.compose.material3.BadgeBox
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.ExtendedFloatingActionButton
@@ -207,7 +207,7 @@ fun ReaderApp() {
                         selected = selectedTab == ReaderTab.INBOX,
                         onClick = { selectTab(ReaderTab.INBOX) },
                         icon = {
-                            BadgeBox(
+                            BadgedBox(
                                 badge = {
                                     if (unreadCount > 0) {
                                         Badge { Text(unreadCount.toString()) }
