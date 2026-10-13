@@ -1,0 +1,34 @@
+name: Initialize Gradle Wrapper JAR
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'gradle/wrapper/gradle-wrapper.properties'
+      - '.github/workflows/wrapper-bootstrap.yml'
+  workflow_dispatch:
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Commit official Gradle Wrapper JAR when absent
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -f gradle/wrapper/gradle-wrapper.jar ]; then
+            echo "Wrapper JAR already committed."
+            exit 0
+          fi
+          curl --fail --location --silent --show-error \
+            https://raw.githubusercontent.com/gradle/gradle/v9.6.1/gradle/wrapper/gradle-wrapper.jar \
+            --output gradle/wrapper/gradle-wrapper.jar
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add gradle/wrapper/gradle-wrapper.jar
+          git commit -m "build: add official Gradle Wrapper JAR"
+          git push origin HEAD:main
