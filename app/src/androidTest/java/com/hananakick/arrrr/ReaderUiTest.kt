@@ -76,8 +76,19 @@ class ReaderUiTest {
     private fun screenshot(name: String) {
         compose.waitForIdle()
         val folder=File(app.getExternalFilesDir(null),"screenshots").apply{mkdirs()}
+        val screenshot = File(folder, "${layout}-$name.png")
         compose.onRoot().captureToImage().asAndroidBitmap().let { bitmap ->
-            File(folder,"${layout}-$name.png").outputStream().use{bitmap.compress(Bitmap.CompressFormat.PNG,100,it)}
+            screenshot.outputStream().use { check(bitmap.compress(Bitmap.CompressFormat.PNG,100,it)) }
+        }
+        check(screenshot.length() > 0L) { "Empty screenshot: ${screenshot.name}" }
+        // AGP may uninstall the tested app after instrumentation completes. Android/data
+        // is then deleted, so copy snapshots to public storage owned by the shell user
+        // while the app is still installed. Reading the pipe waits for cp to complete.
+        val output = InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand(
+            "mkdir -p /sdcard/Download/ArrrrScreenshots && cp '${screenshot.absolutePath}' '/sdcard/Download/ArrrrScreenshots/${screenshot.name}'"
+        )
+        output.use { pipe ->
+            java.io.FileInputStream(pipe.fileDescriptor).bufferedReader().use { it.readText() }
         }
     }
 }
