@@ -33,6 +33,8 @@ data class Article(
     val read: Boolean = false,
     val saved: Boolean = false,
     val savedAt: Long = 0,
+    /** Sanitized, feed-provided HTML (Atom content / RSS content:encoded); empty for summary-only feeds. */
+    val feedHtml: String = "",
 )
 
 data class LibrarySnapshot(val sources: List<FeedSource> = emptyList(), val articles: List<Article> = emptyList()) {

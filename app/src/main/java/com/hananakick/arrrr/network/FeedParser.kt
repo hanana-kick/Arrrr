@@ -62,16 +62,34 @@ object FeedParser {
                 else entry.child("link")?.textContent
             val url=resolve(siteUrl,href.orEmpty())
             val guid=entry.child(if(atom)"id" else "guid")?.textContent.orEmpty().trim()
-            val bodyElement=entry.child(if(atom)"content" else "encoded") ?: entry.child(if(atom)"summary" else "description")
-            val body=bodyElement?.readableBody().orEmpty().take(150_000)
-            val summary=entry.child(if(atom)"summary" else "description")?.readableBody().orEmpty()
+            val fullElement=entry.child(if(atom)"content" else "encoded")
+            val excerptElement=entry.child(if(atom)"summary" else "description")
+            val bodyElement=fullElement ?: excerptElement
+            val base=url.ifBlank { siteUrl }
+            val htmlCandidate=bodyElement?.let { element ->
+                val html=when {
+                    atom && element.getAttribute("type").equals("xhtml", ignoreCase=true) ->
+                        element.children().joinToString("") { serializeHtml(it) }
+                    atom && element.getAttribute("type").equals("text", ignoreCase=true) ->
+                        Element("p").text(element.textContent).outerHtml()
+                    else -> element.textContent.orEmpty()
+                }
+                FeedHtmlSanitizer.sanitize(html,base)
+            }.orEmpty()
+            val body=plain(htmlCandidate).ifBlank { bodyElement?.readableBody().orEmpty() }.take(150_000)
+            val summary=excerptElement?.readableBody().orEmpty()
                 .ifBlank { body }.replace(Regex("\\s+")," ").take(500)
+            // Atom content / RSS content:encoded may contain the entire publisher entry.
+            // A long description-only feed is also usable without a separate scraper.
+            val hasFullBody=fullElement!=null || (body.length>=800 && htmlCandidate.isNotBlank())
+            val feedHtml=if(hasFullBody)htmlCandidate else ""
             val timestamp=entry.child("published")?.textContent ?: entry.child("pubdate")?.textContent
                 ?: entry.child("date")?.textContent ?: entry.child("updated")?.textContent
             Article(
                 id=stableId(sourceId+"\n"+guid.ifBlank { url.ifBlank { title } }),sourceId=sourceId,
                 title=title,url=url,summary=summary,body=body.ifBlank { summary },
                 publishedAt=parseDate(timestamp.orEmpty()) ?: (now-index*1000L),
+                feedHtml=feedHtml,
             )
         }.distinctBy { it.id }
         return ParsedFeed(
@@ -123,6 +141,23 @@ object FeedParser {
             runCatching { SimpleDateFormat(pattern,Locale.US).apply { isLenient=false }.parse(value.trim())?.let { return it.time } }
         }
         return null
+    }
+    private fun serializeHtml(element: Element): String {
+        fun escape(value: String) = value.replace("&", "&amp;").replace("<", "&lt;")
+            .replace(">", "&gt;").replace("\"", "&quot;")
+        fun visit(node: Node): String = when(node) {
+            is Element -> {
+                val tag=(node.localName ?: node.tagName.substringAfter(':')).lowercase(Locale.ROOT)
+                val attrs=listOf("href", "src", "alt", "title", "data-src").mapNotNull { key ->
+                    node.getAttribute(key).takeIf(String::isNotBlank)?.let { "$key=\""+escape(it)+"\"" }
+                }.joinToString(" ", prefix=if(node.hasAttributes())" " else "")
+                if(tag in setOf("br","hr","img")) "<$tag$attrs>"
+                else "<$tag$attrs>"+(0 until node.childNodes.length).joinToString(""){visit(node.childNodes.item(it))}+"</$tag>"
+            }
+            else -> if(node.nodeType==Node.TEXT_NODE || node.nodeType==Node.CDATA_SECTION_NODE)
+                escape(node.nodeValue.orEmpty()) else ""
+        }
+        return visit(element)
     }
     private fun Element.localNameLower(): String = (localName ?: tagName.substringAfter(':')).lowercase(Locale.ROOT)
     private fun Element.children(): List<Element> = (0 until childNodes.length).mapNotNull { childNodes.item(it) as? Element }

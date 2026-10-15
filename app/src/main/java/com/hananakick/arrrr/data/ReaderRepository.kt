@@ -33,6 +33,13 @@ class ReaderRepository(context: Context, private val database: ReaderDatabase, p
             if (!force && _fullContent.value[article.id] is FullContentState.Ready) return
             if (!contentFetches.add(article.id)) return
         }
+        // Atom <content> and RSS content:encoded are the primary article source.
+        // Do not scrape the GeekNews topic page when the feed already provided its body.
+        if (!force && article.feedHtml.isNotBlank()) {
+            _fullContent.update { it + (article.id to FullContentState.Ready(article.feedHtml)) }
+            synchronized(storageLock) { contentFetches.remove(article.id) }
+            return
+        }
         _fullContent.update { it + (article.id to FullContentState.Loading) }
         try {
             val existing = if (force) null else withContext(Dispatchers.IO) {

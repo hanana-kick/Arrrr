@@ -7,7 +7,7 @@ import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 
 /** All calls are serialized by ReaderRepository and run on Dispatchers.IO. */
-class ReaderDatabase(context: Context, name: String = "reader.db") : SQLiteOpenHelper(context, name, null, 2) {
+class ReaderDatabase(context: Context, name: String = "reader.db") : SQLiteOpenHelper(context, name, null, 3) {
     override fun onConfigure(db: SQLiteDatabase) { db.setForeignKeyConstraintsEnabled(true) }
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL("""CREATE TABLE feeds (
@@ -20,16 +20,22 @@ class ReaderDatabase(context: Context, name: String = "reader.db") : SQLiteOpenH
         db.execSQL("""CREATE TABLE articles (
             id TEXT PRIMARY KEY, source_id TEXT NOT NULL REFERENCES feeds(id),
             title TEXT NOT NULL, url TEXT NOT NULL, summary TEXT NOT NULL, body TEXT NOT NULL,
-            published_at INTEGER NOT NULL, is_read INTEGER NOT NULL DEFAULT 0,
+            feed_html TEXT NOT NULL DEFAULT '', published_at INTEGER NOT NULL, is_read INTEGER NOT NULL DEFAULT 0,
             saved INTEGER NOT NULL DEFAULT 0, saved_at INTEGER NOT NULL DEFAULT 0)""")
         db.execSQL("CREATE INDEX article_feed ON articles(source_id, published_at DESC)")
         db.execSQL("CREATE INDEX article_saved ON articles(saved, saved_at DESC)")
         db.execSQL("""CREATE TABLE article_fulltext (article_id TEXT PRIMARY KEY NOT NULL REFERENCES articles(id) ON DELETE CASCADE, html TEXT NOT NULL, fetched_at INTEGER NOT NULL)""")
     }
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        if (oldVersion == 1 && newVersion == 2) {
+        require(oldVersion in 1..2 && newVersion == 3) { "Missing database migration: $oldVersion -> $newVersion" }
+        if (oldVersion < 2) {
             db.execSQL("""CREATE TABLE article_fulltext (article_id TEXT PRIMARY KEY NOT NULL REFERENCES articles(id) ON DELETE CASCADE, html TEXT NOT NULL, fetched_at INTEGER NOT NULL)""")
-        } else error("Missing database migration: $oldVersion -> $newVersion")
+        }
+        if (oldVersion < 3) {
+            db.execSQL("ALTER TABLE articles ADD COLUMN feed_html TEXT NOT NULL DEFAULT ''")
+            // Re-fetch conditional feeds once: existing articles predate HTML preservation.
+            db.execSQL("UPDATE feeds SET etag='', last_modified=''")
+        }
     }
     fun snapshot(): LibrarySnapshot {
         val feeds = readableDatabase.rawQuery("SELECT * FROM feeds ORDER BY name COLLATE NOCASE", null).use { c ->
@@ -102,7 +108,7 @@ class ReaderDatabase(context: Context, name: String = "reader.db") : SQLiteOpenH
     }
     private fun Article.values() = ContentValues().apply {
         put("id", id); put("source_id", sourceId); put("title", title); put("url", url)
-        put("summary", summary); put("body", body); put("published_at", publishedAt)
+        put("summary", summary); put("body", body); put("feed_html", feedHtml); put("published_at", publishedAt)
         put("is_read", if (read) 1 else 0); put("saved", if (saved) 1 else 0); put("saved_at", savedAt)
     }
     private fun Cursor.s(key: String) = getString(getColumnIndexOrThrow(key))
@@ -116,5 +122,6 @@ class ReaderDatabase(context: Context, name: String = "reader.db") : SQLiteOpenH
     private fun Cursor.article() = Article(
         id=s("id"), sourceId=s("source_id"), title=s("title"), url=s("url"), summary=s("summary"),
         body=s("body"), publishedAt=n("published_at"), read=n("is_read")!=0L, saved=n("saved")!=0L, savedAt=n("saved_at"),
+        feedHtml=s("feed_html"),
     )
 }
