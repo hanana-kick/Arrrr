@@ -52,7 +52,11 @@ object FullArticleExtractor {
                                 .attr("alt", node.attr("alt").take(180)).outerHtml())
                         }
                     }
-                    name in paragraphs -> emit(when(name) { "h2", "h3", "h4" -> "h2"; "blockquote" -> "blockquote"; "pre" -> "pre"; else -> "p" }, node.text())
+                    name in paragraphs -> {
+                        emit(when(name) { "h2", "h3", "h4" -> "h2"; "blockquote" -> "blockquote"; "pre" -> "pre"; else -> "p" }, node.text())
+                        // Image elements are often nested inside <p> tags.
+                        node.select("img").forEach { visit(it, depth + 1) }
+                    }
                     name in wrappers || name == "body" -> {
                         for (child in node.childNodes()) {
                             if (child is TextNode && child.text().trim().length > 90) emit("p", child.text())

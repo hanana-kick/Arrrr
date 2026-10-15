@@ -85,7 +85,12 @@ class ReaderUiTest {
         compose.onNodeWithTag("reader-page").assertExists()
         compose.onAllNodesWithTag("reader-motion").assertCountEquals(0)
         compose.onAllNodesWithTag("sheet-handle").assertCountEquals(0)
-        compose.waitUntil(10000) { compose.onAllNodesWithText("원문 전체 본문 1번째 문단.", substring = true).fetchSemanticsNodes().isNotEmpty() }
+        // The first body block can be below the fold in a 400dp-high window.
+        compose.waitUntil(10000) { app.repository.fullContent.value["fixture1"] is FullContentState.Ready }
+        compose.waitForIdle()
+        compose.onNodeWithTag("reader-scroll").performScrollToIndex(2)
+        compose.onAllNodesWithText("원문 전체 본문 1번째 문단.", substring = true).assertExists()
+        compose.onNodeWithTag("reader-scroll").performScrollToIndex(0)
         compose.onNodeWithTag("reader-bookmark").performClick()
         compose.waitUntil(10000) { app.repository.library.value.articles.first { it.id == "fixture1" }.saved }
         compose.onNodeWithTag("reader-appearance").performClick()
@@ -132,9 +137,8 @@ class ReaderUiTest {
     @Test fun dedicatedPageFullArticleNextPreviousAndPosition() {
         compose.onNodeWithTag("article_fixture1").performClick()
         compose.onNodeWithTag("reader-page").assertExists()
-        compose.waitUntil(10000) {
-            compose.onAllNodesWithText("원문 전체 본문 1번째 문단.", substring = true).fetchSemanticsNodes().isNotEmpty()
-        }
+        compose.waitUntil(10000) { app.repository.fullContent.value["fixture1"] is FullContentState.Ready }
+        compose.waitForIdle()
         compose.onNodeWithTag("reader-scroll").performScrollToIndex(14)
         compose.waitForIdle()
         screenshot("full-article-end")
