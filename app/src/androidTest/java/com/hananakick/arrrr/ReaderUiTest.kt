@@ -89,7 +89,7 @@ class ReaderUiTest {
         compose.waitUntil(10000) { app.repository.fullContent.value["fixture1"] is FullContentState.Ready }
         compose.waitForIdle()
         compose.onNodeWithTag("reader-scroll").performScrollToIndex(2)
-        compose.onAllNodesWithText("원문 전체 본문 1번째 문단.", substring = true).assertExists()
+        compose.onNodeWithText("원문 전체 본문 1번째 문단.", substring = true).assertExists()
         compose.onNodeWithTag("reader-scroll").performScrollToIndex(0)
         compose.onNodeWithTag("reader-bookmark").performClick()
         compose.waitUntil(10000) { app.repository.library.value.articles.first { it.id == "fixture1" }.saved }
