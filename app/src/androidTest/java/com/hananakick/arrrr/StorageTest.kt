@@ -14,7 +14,8 @@ class StorageTest {
         val name="storage-test.db"
         context.deleteDatabase(name)
         val feed=FeedSource("source","테스트","https://example.org/feed")
-        val a=Article("article","source","Title","https://example.org/a","Summary","Body",1L)
+        val html = "<ul><li><a href=\"https://example.org/full\">전체 본문</a></li></ul>"
+        val a=Article("article","source","Title","https://example.org/a","Summary","Body",1L,feedHtml=html)
         ReaderDatabase(context,name).use { db ->
             db.put(feed,listOf(a))
             db.setSaved(a.id,true);db.markRead(a.id)
@@ -22,6 +23,7 @@ class StorageTest {
             db.put(feed,listOf(a.copy(title="Updated")))
             val item=db.snapshot().articles.single()
             assertTrue(item.saved);assertTrue(item.read);assertEquals("Updated",item.title)
+            assertEquals(html, item.feedHtml)
             assertEquals("<p>Full article text</p>", db.fullContent(a.id))
             db.unsubscribe(feed.id)
             assertTrue(db.snapshot().subscriptions.isEmpty())
@@ -29,6 +31,7 @@ class StorageTest {
         }
         ReaderDatabase(context,name).use { db ->
             assertTrue(db.snapshot().articles.single().saved)
+            assertEquals(html, db.snapshot().articles.single().feedHtml)
             assertEquals("<p>Full article text</p>", db.fullContent(a.id))
         }
         context.deleteDatabase(name)

@@ -134,6 +134,29 @@ class ReaderUiTest {
         assertEquals("paper", runBlocking { ReadingPreferences(app).theme.first() })
     }
 
+    @Test fun geekNewsAtomHtmlIsRenderedWithoutRequestingTopicPage() {
+        val content = """<ul><li><a href="https://example.org/project">프로젝트 원문</a>의 첫 번째 설명</li>
+            <li>두 번째 <strong>중요한</strong> 설명</li></ul><p>RSS에 실린 본문입니다.</p>"""
+        val source=FeedSource("geeknews","GeekNews","https://news.hada.io/rss/news",folder="기술")
+        val article=Article("geek-html","geeknews","RSS HTML 본문 확인",
+            "https://example.invalid/offline-test","간단한 요약","RSS에 실린 본문입니다.",
+            System.currentTimeMillis()+60_000,feedHtml=content)
+        runBlocking {
+            ReaderDatabase(app).use { db -> db.put(source,listOf(article)) }
+            app.repository.load()
+        }
+        compose.waitUntil(10000) { compose.onAllNodesWithTag("article_geek-html").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("article_geek-html").performClick()
+        compose.waitUntil(10000) {
+            (app.repository.fullContent.value[article.id] as? FullContentState.Ready)?.html==content
+        }
+        compose.onNodeWithTag("reader-scroll").performScrollToIndex(2)
+        compose.onNodeWithText("프로젝트 원문",substring=true).assertExists()
+        compose.onNodeWithTag("reader-scroll").performScrollToIndex(3)
+        compose.onNodeWithText("두 번째 중요한 설명",substring=true).assertExists()
+        screenshot("atom-rich-html")
+    }
+
     @Test fun dedicatedPageFullArticleNextPreviousAndPosition() {
         compose.onNodeWithTag("article_fixture1").performClick()
         compose.onNodeWithTag("reader-page").assertExists()
