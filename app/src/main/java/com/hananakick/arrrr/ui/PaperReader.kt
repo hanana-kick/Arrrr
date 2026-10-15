@@ -7,7 +7,6 @@ import android.content.ContextWrapper
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.animation.core.animate
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -41,6 +40,7 @@ import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.heading
@@ -63,7 +63,6 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.max
-import kotlin.math.min
 
 private class ReaderInputGate {
     var touching = false
@@ -83,11 +82,13 @@ internal fun PaperReader(
     onSave: (Boolean) -> Unit, onNavigate: (String) -> Unit,
 ) {
     val context = LocalContext.current
+    val windowView = LocalView.current.rootView
     val density = LocalDensity.current
     val viewConfiguration = LocalViewConfiguration.current
     val scope = rememberCoroutineScope()
     val appColors = MaterialTheme.colorScheme
     val appDark = isReaderDark(settings)
+    val currentAppDark by rememberUpdatedState(appDark)
     val palette = readingColorScheme(readingTheme, appColors)
     val reduceMotion = !ValueAnimator.areAnimatorsEnabled()
     val spatial = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
@@ -124,7 +125,7 @@ internal fun PaperReader(
             motionJob?.cancel(); wheelSnap?.cancel()
             context.readerActivity()?.let { activity ->
                 WindowCompat.getInsetsController(activity.window, activity.window.decorView).apply {
-                    isAppearanceLightStatusBars = !appDark; isAppearanceLightNavigationBars = !appDark
+                    isAppearanceLightStatusBars = !currentAppDark; isAppearanceLightNavigationBars = !currentAppDark
                 }
             }
         }
@@ -162,7 +163,7 @@ internal fun PaperReader(
                     } finally { animating = false }
                 }
             }
-            fun performTurn(step: Int, force: Boolean = false) {
+            fun performTurn(step: Int) {
                 val target = if (step == 1) currentNext else currentPrevious
                 if (turning || target == null) return
                 motionJob?.cancel(); wheelSnap?.cancel()
@@ -197,7 +198,7 @@ internal fun PaperReader(
                 reveal = ReadingMotion.reveal(rawPull, height)
                 return deltaDp
             }
-            val connection = remember(scroll, isCard, height, appearanceOpen, reduceMotion) {
+            val connection = remember(scroll, isCard, height, openingSerial, appearanceOpen, reduceMotion) {
                 object : NestedScrollConnection {
                     override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
                         if (appearanceOpen || turning || source != NestedScrollSource.UserInput) return Offset.Zero
@@ -237,13 +238,12 @@ internal fun PaperReader(
             }
             fun Modifier.exclude(key: String): Modifier = onGloballyPositioned { gate.excluded[key] = it.boundsInWindow() }
             val inputModifier = Modifier.onGloballyPositioned { gate.coordinates = it }
-                .pointerInput(article.id, isCard, appearanceOpen) {
+                .pointerInput(article.id, isCard, openingSerial, appearanceOpen, safeTopPx, safeBottomPx) {
                     awaitEachGesture {
                         val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
                         val global = gate.coordinates?.localToWindow(down.position) ?: down.position
-                        val windowHeight = context.resources.displayMetrics.heightPixels.toFloat()
-                        val safe = global.y >= safeTopPx && global.y <= windowHeight - safeBottomPx &&
-                            global.x >= 16.dp.toPx() && global.x <= context.resources.displayMetrics.widthPixels - 16.dp.toPx()
+                        val safe = global.y >= safeTopPx && global.y <= windowView.height - safeBottomPx &&
+                            global.x >= 16.dp.toPx() && global.x <= windowView.width - 16.dp.toPx()
                         gate.touching = true
                         gate.direct = down.type == PointerType.Touch && safe && !appearanceOpen && !gate.excluded.values.any { it.contains(global) }
                         var moved = false
@@ -262,7 +262,7 @@ internal fun PaperReader(
                     }
                 }.onPreviewKeyEvent { event ->
                     if (event.type == KeyEventType.KeyDown && event.isAltPressed && event.key in listOf(Key.DirectionUp, Key.DirectionDown)) {
-                        performTurn(if (event.key == Key.DirectionDown) 1 else -1, true); true
+                        performTurn(if (event.key == Key.DirectionDown) 1 else -1); true
                     } else false
                 }
             val currentHeight = (height - sheetTop).coerceAtLeast(1f)
@@ -302,7 +302,7 @@ internal fun PaperReader(
                             contentPadding = PaddingValues(start = 24.dp, end = 24.dp, top = topSafe + handleHeight + 80.dp,
                                 bottom = bottomInset + 104.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
                             if (previous != null) item(key = "previous") {
-                                TextButton(onClick = { performTurn(-1, true) }, modifier = Modifier.exclude("previous").testTag("previous-article")) { Text("이전 글") }
+                                TextButton(onClick = { performTurn(-1) }, modifier = Modifier.exclude("previous").testTag("previous-article")) { Text("이전 글") }
                             }
                             item(key = "title") { Text(article.title, style = MaterialTheme.typography.headlineLarge,
                                 modifier = Modifier.testTag("reader-title").semantics { heading() }) }
@@ -331,13 +331,15 @@ internal fun PaperReader(
                                 Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.testTag("reader-end")) {
                                     Text("이 글을 다 읽었어요.", style = MaterialTheme.typography.bodySmall, color = palette.onSurfaceVariant)
                                     if (next != null) {
-                                        TextButton(onClick = { performTurn(1, true) }, modifier = Modifier.exclude("next").testTag("next-article")) { Text("다음 글 →") }
+                                        TextButton(onClick = { performTurn(1) }, modifier = Modifier.exclude("next").testTag("next-article")) { Text("다음 글 →") }
                                         Text("끝에서 위로 더 당겨 다음 글로 넘길 수 있어요.", style = MaterialTheme.typography.bodySmall, color = palette.onSurfaceVariant)
                                     } else Text("현재 조건의 마지막 글입니다.", style = MaterialTheme.typography.bodySmall, color = palette.onSurfaceVariant)
                                 }
                             }
                         }
-                        val collapsed by remember(scroll) { derivedStateOf { scroll.firstVisibleItemIndex > if (previous == null) 0 else 1 || scroll.firstVisibleItemScrollOffset > 120 } }
+                        val collapsed by remember(scroll, previous?.id) { derivedStateOf {
+                            scroll.firstVisibleItemIndex > (if (previous == null) 0 else 1) || scroll.firstVisibleItemScrollOffset > 120
+                        } }
                         if (reveal < 1f) {
                             Column(Modifier.align(Alignment.TopCenter).fillMaxWidth().exclude("header")) {
                                 if (topSafe > 0.dp) Box(Modifier.fillMaxWidth().height(topSafe).background(if (isCard) appColors.surface else palette.surface))
@@ -361,8 +363,8 @@ internal fun PaperReader(
                                             IconButton(onClick = { menu = true }) { Glyph(R.drawable.ic_more, "읽기 메뉴") }
                                             DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                                                 if (!isCard && partial) DropdownMenuItem(text = { Text("전체 화면으로 펼치기") }, onClick = { menu = false; snapSheet(true) })
-                                                DropdownMenuItem(text = { Text("이전 글") }, enabled = previous != null, onClick = { menu = false; performTurn(-1, true) })
-                                                DropdownMenuItem(text = { Text("다음 글") }, enabled = next != null, onClick = { menu = false; performTurn(1, true) })
+                                                DropdownMenuItem(text = { Text("이전 글") }, enabled = previous != null, onClick = { menu = false; performTurn(-1) })
+                                                DropdownMenuItem(text = { Text("다음 글") }, enabled = next != null, onClick = { menu = false; performTurn(1) })
                                                 DropdownMenuItem(text = { Text("원문 열기") }, enabled = article.url.isNotBlank(), onClick = { menu = false; openOriginal(context, article.url) })
                                             }
                                         }
@@ -381,16 +383,15 @@ internal fun PaperReader(
                 }
             }
             if (appearanceOpen) ReadingAppearanceDialog(settings, readingTheme,
-                onSettingsChange = { transform ->
-                    // LazyColumn's stable paragraph keys keep the first visible paragraph anchored.
-                    savePosition(); onSettingsChange(transform)
-                }, onTheme = onReadingTheme, onDismiss = { appearanceOpen = false })
+                onSettingsChange = { transform -> savePosition(); onSettingsChange(transform) },
+                onTheme = onReadingTheme, onDismiss = { appearanceOpen = false })
         }
     }
 }
 
 internal fun readingColorScheme(mode: String, app: ColorScheme): ColorScheme = when (mode) {
-    "light" -> lightColorScheme(primary = app.primary, surface = Color.White, onSurface = Color(0xFF20272B), surfaceContainer = Color(0xFFEEF1F3), onSurfaceVariant = Color(0xFF58676E))
+    "light" -> lightColorScheme(primary = Color(0xFF27665E), onPrimary = Color.White, surface = Color.White,
+        onSurface = Color(0xFF20272B), surfaceContainer = Color(0xFFEEF1F3), onSurfaceVariant = Color(0xFF58676E))
     "paper" -> lightColorScheme(primary = Color(0xFF526343), onPrimary = Color.White, surface = Color(0xFFF7F0DF), background = Color(0xFFF7F0DF),
         onSurface = Color(0xFF302E25), onSurfaceVariant = Color(0xFF676253), surfaceContainer = Color(0xFFEAE2CE), secondaryContainer = Color(0xFFDFE9D1))
     "dark" -> darkColorScheme(primary = Color(0xFF93CBBF), onPrimary = Color(0xFF123A33), surface = Color(0xFF1E2428),

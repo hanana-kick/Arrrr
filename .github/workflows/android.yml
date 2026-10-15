@@ -19,11 +19,20 @@ jobs:
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
+      - name: Archive exact source used by this run
+        run: git archive --format=zip HEAD -o source-snapshot.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: source-snapshot
+          path: source-snapshot.zip
+          if-no-files-found: error
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
       - uses: android-actions/setup-android@v4
+        with:
+          log-accepted-android-sdk-licenses: false
       - run: sdkmanager "platforms;android-37.0" "build-tools;36.0.0"
       - uses: gradle/actions/setup-gradle@v6
       - name: Restore existing preview signing identity
@@ -78,6 +87,8 @@ jobs:
           distribution: temurin
           java-version: '17'
       - uses: android-actions/setup-android@v4
+        with:
+          log-accepted-android-sdk-licenses: false
       - run: sdkmanager "platforms;android-37.0" "build-tools;36.0.0"
       - uses: gradle/actions/setup-gradle@v6
       - name: Enable KVM

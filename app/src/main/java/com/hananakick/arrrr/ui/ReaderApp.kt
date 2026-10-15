@@ -38,6 +38,7 @@ fun ReaderApp(model: ReaderViewModel, settings: ReaderSettings) {
 
     BoxWithConstraints(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
         val rail = maxWidth >= 600.dp
+        val tallWindow = maxHeight >= 480.dp
         Row(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.displayCutout.only(WindowInsetsSides.Horizontal))) {
             if (rail) {
                 NavigationRail(modifier = Modifier.fillMaxHeight().width(80.dp).testTag("navigation-rail"),
@@ -45,7 +46,7 @@ fun ReaderApp(model: ReaderViewModel, settings: ReaderSettings) {
                     containerColor = MaterialTheme.colorScheme.surface) {
                     Spacer(Modifier.height(12.dp))
                     Destination.entries.forEach { item ->
-                        if (item == Destination.SETTINGS && maxHeight >= 480.dp) Spacer(Modifier.weight(1f))
+                        if (item == Destination.SETTINGS && tallWindow) Spacer(Modifier.weight(1f))
                         NavigationRailItem(selected = destination == item, onClick = { destination = item },
                             icon = { Glyph(item.icon) }, label = { Text(item.label) }, modifier = Modifier.testTag("nav_${item.name}"))
                     }
