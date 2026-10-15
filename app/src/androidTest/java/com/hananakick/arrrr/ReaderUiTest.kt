@@ -15,11 +15,26 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.junit.rules.TestWatcher
+import org.junit.runner.Description
 import java.io.File
 
 @RunWith(AndroidJUnit4::class)
 class ReaderUiTest {
-    @get:Rule val compose = createAndroidComposeRule<MainActivity>()
+    @get:Rule(order = 0) val compose = createAndroidComposeRule<MainActivity>()
+    // Capture the real failing UI before the outer activity rule tears down the app.
+    @get:Rule(order = 1) val evidence = object : TestWatcher() {
+        override fun failed(error: Throwable, description: Description) {
+            runCatching {
+                screenshot("failure-" + description.methodName)
+                val folder = File(app.getExternalFilesDir(null), "screenshots").apply { mkdirs() }
+                val dump = File(folder, "$layout-failure-semantics.txt")
+                val roots = compose.onAllNodes(isRoot(), useUnmergedTree = true)
+                dump.writeText(roots.fetchSemanticsNodes().indices.joinToString("\n\n") { index -> roots[index].printToString() })
+                shell("cp ${dump.absolutePath} /sdcard/Download/ArrrrScreenshots/${dump.name}")
+            }.onFailure { android.util.Log.e("ReaderUiTest", "Could not collect failure evidence", it) }
+        }
+    }
     private val app get() = compose.activity.application as ReaderApplication
     private val layout get() = InstrumentationRegistry.getArguments().getString("layout", "compact")
     private val longBody = (1..12).joinToString("\n\n") { index ->
@@ -80,21 +95,33 @@ class ReaderUiTest {
         screenshot("reader-paper")
         if (layout != "wide") compose.onNodeWithTag("reader-back").performClick()
         compose.onNodeWithTag("open-filters").performClick()
-        compose.onNodeWithTag("filter-saved").performClick()
-        compose.onNodeWithTag("filter-read_1").performClick()
+        compose.onNodeWithTag("filter-saved").performScrollTo().assertIsDisplayed().performClick().assertIsOn()
+        compose.onNodeWithTag("filter-read_1").performScrollTo().assertIsDisplayed().performClick().assertIsOn()
         compose.onNodeWithTag("apply-reading-filter").performClick()
         compose.waitUntil(10000) { compose.onAllNodesWithTag("article_fixture2").fetchSemanticsNodes().isNotEmpty() }
         compose.onAllNodesWithTag("article_fixture1").assertCountEquals(0)
         screenshot("saved-unread-filter")
         compose.onNodeWithTag("nav_SETTINGS").performClick()
         compose.onNodeWithTag("settings_THEME").performClick()
-        compose.onNodeWithTag("theme-mode_2").performClick()
-        compose.onNodeWithTag("palette_1").performScrollTo().performClick()
+        // A semantic node can exist outside a short viewport. Scroll it into view
+        // before sending an actual tap, and verify the selected state immediately.
+        compose.onNodeWithTag("theme-mode_2").performScrollTo().assertIsDisplayed().performClick().assertIsOn()
         compose.waitUntil(10000) { runBlocking { app.settings.flow.first() }.themeMode == "dark" }
+        compose.onNodeWithTag("palette_1").performScrollTo().assertIsDisplayed().performClick().assertIsOn()
+        compose.waitUntil(10000) { runBlocking { app.settings.flow.first() }.seedColor == 0xFF365F89 }
+        if (layout == "wide") {
+            compose.onNodeWithTag("settings-preview-side").assertIsDisplayed()
+        } else {
+            compose.onAllNodesWithTag("settings-preview-side").assertCountEquals(0)
+            compose.onNodeWithTag("settings-preview").performClick()
+            compose.onNodeWithTag("settings-preview-dialog").assertIsDisplayed()
+            screenshot("settings-preview")
+            compose.onNodeWithTag("settings-preview-done").assertIsDisplayed().performClick()
+        }
         screenshot("settings-dark")
         compose.activityRule.scenario.recreate()
         compose.waitUntil(10000) { compose.onAllNodesWithTag("theme-mode_2").fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithTag("theme-mode_2").assertIsOn()
+        compose.onNodeWithTag("theme-mode_2").performScrollTo().assertIsDisplayed().assertIsOn()
         assertEquals("paper", runBlocking { ReadingPreferences(app).theme.first() })
     }
 

@@ -21,7 +21,7 @@ import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ReadingDialog(
+internal fun ReadingDialog(
     title: String, onDismiss: () -> Unit, tag: String,
     footer: @Composable RowScope.() -> Unit,
     content: @Composable ColumnScope.() -> Unit,

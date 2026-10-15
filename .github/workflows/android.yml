@@ -105,14 +105,7 @@ jobs:
           profile: pixel_6
           disable-animations: false
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-          script: |
-            adb shell rm -rf /sdcard/Download/ArrrrScreenshots
-            adb shell wm size ${{ matrix.size }}
-            adb shell wm density 320
-            ./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.layout=${{ matrix.layout }} --stacktrace
-            mkdir -p ui-screenshots
-            adb pull /sdcard/Download/ArrrrScreenshots/. ui-screenshots/
-            test "$(find ui-screenshots -name '*.png' -size +4k | wc -l)" -ge 5
+          script: bash scripts/run-device-tests.sh ${{ matrix.layout }} ${{ matrix.size }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:
