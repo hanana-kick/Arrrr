@@ -37,25 +37,6 @@ import com.hananakick.arrrr.ui.theme.isReaderDark
 import kotlinx.coroutines.flow.distinctUntilChanged
 import org.jsoup.Jsoup
 
-private sealed interface ArticleBlock {
-    data class Text(val value: String, val type: String = "p") : ArticleBlock
-    data class Image(val url: String, val alt: String) : ArticleBlock
-}
-
-private fun articleBlocks(html: String): List<ArticleBlock> {
-    if (html.isBlank()) return emptyList()
-    val body = Jsoup.parseBodyFragment(html).body()
-    return body.children().take(400).mapNotNull { element ->
-        when (element.normalName()) {
-            "img" -> element.attr("src").takeIf { it.startsWith("https://") || it.startsWith("http://") }
-                ?.let { ArticleBlock.Image(it, element.attr("alt")) }
-            "p", "h2", "h3", "blockquote", "pre" -> element.text().takeIf(String::isNotBlank)
-                ?.let { ArticleBlock.Text(it, element.normalName()) }
-            else -> null
-        }
-    }
-}
-
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun ArticlePage(
@@ -86,8 +67,9 @@ internal fun ArticlePage(
         onDispose { positions[article.id] = ReadingPosition(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset) }
     }
     val collapsed by remember(listState) { derivedStateOf { listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 120 } }
-    val blocks = remember((content as? FullContentState.Ready)?.html) {
-        articleBlocks((content as? FullContentState.Ready)?.html.orEmpty())
+    val preferredHtml = (content as? FullContentState.Ready)?.html ?: article.feedHtml
+    val blocks = remember(preferredHtml, scheme.primary) {
+        parseReaderBlocks(preferredHtml, scheme.primary)
     }
     DisposableEffect(readerDark, appDark) {
         context.readerActivity()?.let { activity ->
@@ -138,15 +120,14 @@ internal fun ArticlePage(
                             TextButton(onClick = onReload, modifier = Modifier.testTag("retry-full-text")) { Text("원문 다시 가져오기") }
                         }
                     }
-                    if (content !is FullContentState.Ready && article.summary.isNotBlank() && !article.body.startsWith(article.summary))
+                    if (content !is FullContentState.Ready && article.feedHtml.isBlank() &&
+                        article.summary.isNotBlank() && !article.body.startsWith(article.summary))
                         item(key = "summary") { ReadingText(article.summary, settings, scheme.onSurfaceVariant) }
                     if (blocks.isNotEmpty()) {
                         itemsIndexed(blocks, key = { index, _ -> "block-$index" }) { _, block ->
                             when (block) {
-                                is ArticleBlock.Text -> ReadingText(block.value, settings,
-                                    if (block.type == "blockquote") scheme.onSurfaceVariant else scheme.onSurface,
-                                    heading = block.type == "h2" || block.type == "h3")
-                                is ArticleBlock.Image -> Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                                is ReaderBlock.Paragraph -> ReadingRichText(block.text, block.type, settings, scheme)
+                                is ReaderBlock.Image -> Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
                                     AsyncImage(model = block.url, contentDescription = block.alt.ifBlank { null },
                                         modifier = Modifier.fillMaxWidth().widthIn(max = 740.dp).heightIn(min = 80.dp, max = 480.dp)
                                             .clip(RoundedCornerShape(12.dp)), contentScale = ContentScale.Fit)
