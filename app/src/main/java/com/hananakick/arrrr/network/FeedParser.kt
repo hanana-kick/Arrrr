@@ -123,7 +123,8 @@ object FeedParser {
         return cleanWhitespace(body.wholeText())
     }
     private fun cleanWhitespace(text: String): String = text.replace('\u00a0',' ')
-        .replace(Regex("[ \\t]+\\n"),"\n").replace(Regex("\\n{3,}"),"\n\n").trim()
+        .replace(Regex("[ \\t]+\\n"),"\n").replace(Regex("\\n[ \\t]+"),"\n")
+        .replace(Regex("\\n{3,}"),"\n\n").trim()
 
     fun resolve(base: String, value: String): String {
         if(value.isBlank())return ""
