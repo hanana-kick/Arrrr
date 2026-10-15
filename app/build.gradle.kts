@@ -10,8 +10,8 @@ android {
         applicationId = "com.hananakick.arrrr"
         minSdk = 26
         targetSdk = 37
-        versionCode = 2
-        versionName = "0.2.0"
+        versionCode = 3
+        versionName = "0.3.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     buildTypes {
@@ -25,11 +25,10 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     buildFeatures { compose = true; buildConfig = true }
-    testOptions { unitTests.isIncludeAndroidResources = true; animationsDisabled = true }
+    testOptions { unitTests.isIncludeAndroidResources = true; animationsDisabled = false }
     packaging { resources.excludes += "/META-INF/{AL2.0,LGPL2.1}" }
 }
 
-// Keep expected/actual values visible in CI, even when report artifacts cannot be opened.
 tasks.withType<Test>().configureEach {
     outputs.upToDateWhen { false }
     outputs.cacheIf { false }
@@ -63,9 +62,7 @@ dependencies {
     implementation("io.coil-kt.coil3:coil-compose:3.3.0")
     implementation("io.coil-kt.coil3:coil-network-okhttp:3.3.0")
     implementation("io.coil-kt.coil3:coil-svg:3.3.0")
-    implementation("com.google.android.material:material:1.13.0") // Material Color Utilities only; no View UI.
-    // AndroidTest resolves against the app runtime. Align these versions with
-    // androidx.test:runner 1.7.0, ext:junit 1.3.0 and Espresso 3.7.0.
+    implementation("com.google.android.material:material:1.13.0")
     implementation("androidx.concurrent:concurrent-futures:1.2.0")
     implementation("androidx.concurrent:concurrent-futures-ktx:1.2.0")
     implementation("com.google.errorprone:error_prone_annotations:2.30.0")
