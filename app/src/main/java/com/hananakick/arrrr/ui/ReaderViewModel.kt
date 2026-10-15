@@ -15,6 +15,7 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
     val library = app.repository.library
     val ready = app.repository.ready
     val refreshing = app.repository.refreshing
+    val fullContent = app.repository.fullContent
     val settings = app.settings.flow.stateIn(viewModelScope, SharingStarted.Eagerly, ReaderSettings())
     val readingTheme = reading.theme.stateIn(viewModelScope, SharingStarted.Eagerly, "app")
     private val messages = Channel<String>(Channel.BUFFERED)
@@ -22,6 +23,9 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
 
     fun updateSettings(change: (ReaderSettings) -> ReaderSettings) = launchAction { app.settings.update(change) }
     fun setReadingTheme(value: String) = launchAction { reading.setTheme(value) }
+    fun loadFullArticle(article: Article, force: Boolean = false) = viewModelScope.launch {
+        app.repository.loadFullContent(article, force)
+    }
     fun markRead(id: String) = launchAction { app.repository.markRead(id) }
     fun setSaved(id: String, saved: Boolean) = launchAction { app.repository.setSaved(id, saved) }
     fun markAllRead() = launchAction { app.repository.markAllRead() }

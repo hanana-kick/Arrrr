@@ -26,6 +26,7 @@ fun ReaderApp(model: ReaderViewModel, settings: ReaderSettings) {
     val ready by model.ready.collectAsStateWithLifecycle()
     val refreshing by model.refreshing.collectAsStateWithLifecycle()
     val readingTheme by model.readingTheme.collectAsStateWithLifecycle()
+    val fullContent by model.fullContent.collectAsStateWithLifecycle()
     var destination by rememberSaveable { mutableStateOf(Destination.FEED) }
     var sourceFilter by rememberSaveable { mutableStateOf<String?>(null) }
     var adding by rememberSaveable { mutableStateOf(false) }
@@ -58,6 +59,7 @@ fun ReaderApp(model: ReaderViewModel, settings: ReaderSettings) {
                     when (destination) {
                         Destination.FEED -> ArticleWorkspace(
                             library = library, settings = settings, readingTheme = readingTheme,
+                            fullContent = fullContent, onLoadFull = model::loadFullArticle,
                             onSettingsChange = model::updateSettings, onReadingTheme = model::setReadingTheme,
                             sourceFilter = sourceFilter, bottomNavigation = !rail, refreshing = refreshing,
                             onRefresh = model::refresh, onMarkRead = model::markRead, onSave = model::setSaved,

@@ -8,6 +8,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
@@ -22,6 +23,37 @@ class ReaderRepository(context: Context, private val database: ReaderDatabase, p
     val refreshing: StateFlow<Boolean> = _refreshing.asStateFlow()
     private val _ready = MutableStateFlow(false)
     val ready: StateFlow<Boolean> = _ready.asStateFlow()
+
+    private val _fullContent = MutableStateFlow<Map<String, FullContentState>>(emptyMap())
+    val fullContent: StateFlow<Map<String, FullContentState>> = _fullContent.asStateFlow()
+    private val contentFetches = mutableSetOf<String>()
+
+    suspend fun loadFullContent(article: Article, force: Boolean = false) {
+        synchronized(storageLock) {
+            if (!force && _fullContent.value[article.id] is FullContentState.Ready) return
+            if (!contentFetches.add(article.id)) return
+        }
+        _fullContent.update { it + (article.id to FullContentState.Loading) }
+        try {
+            val existing = if (force) null else withContext(Dispatchers.IO) {
+                synchronized(storageLock) { database.fullContent(article.id) }
+            }
+            val html = existing ?: client.fullArticle(article.url, article.body)
+            if (html != null) {
+                if (existing == null) withContext(Dispatchers.IO) {
+                    synchronized(storageLock) { database.saveFullContent(article.id, html) }
+                }
+                _fullContent.update { it + (article.id to FullContentState.Ready(html)) }
+            } else {
+                _fullContent.update { it + (article.id to FullContentState.Unavailable("사이트에서 본문을 추출하지 못했습니다.")) }
+            }
+        } catch (cancelled: CancellationException) {
+            _fullContent.update { it - article.id }
+            throw cancelled
+        } catch (error: Exception) {
+            _fullContent.update { it + (article.id to FullContentState.Unavailable(error.message ?: "원문을 가져올 수 없습니다.")) }
+        } finally { synchronized(storageLock) { contentFetches.remove(article.id) } }
+    }
 
     suspend fun load() = withContext(Dispatchers.IO) {
         synchronized(storageLock) { _library.value=database.snapshot(); _ready.value=true }

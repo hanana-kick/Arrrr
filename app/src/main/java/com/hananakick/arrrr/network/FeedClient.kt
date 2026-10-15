@@ -52,6 +52,15 @@ class FeedClient {
         if (page.notModified) return Download(page.url, null, page.etag, page.modified, true)
         return Download(page.url, FeedParser.parse(page.bytes, page.url, sourceId), page.etag, page.modified)
     }
+    suspend fun fullArticle(url: String, feedBody: String): String? {
+        if (url.isBlank()) return null
+        val page = request(url, maxBytes = 3 * 1024 * 1024,
+            accept = "text/html,application/xhtml+xml;q=0.9,*/*;q=0.5")
+        if (page.contentType.isNotBlank() && !page.contentType.contains("html", ignoreCase = true)) return null
+        val document = Jsoup.parse(page.bytes.inputStream(), null, page.url)
+        return FullArticleExtractor.extract(document.outerHtml(), page.url, feedBody)
+    }
+
     private suspend fun discoverIcon(site: String): String {
         if (site.isBlank()) return ""
         return try {
@@ -66,10 +75,10 @@ class FeedClient {
             .sortedBy { if (it.attr("rel").lowercase().contains("apple-touch")) 0 else if (it.attr("type").contains("png")) 1 else 2 }
             .firstNotNullOfOrNull { FeedParser.resolve(base, it.attr("href")).takeIf(String::isNotBlank) }.orEmpty()
 
-    private suspend fun request(url: String, etag: String = "", modified: String = "", maxBytes: Int = 5 * 1024 * 1024): Page {
+    private suspend fun request(url: String, etag: String = "", modified: String = "", maxBytes: Int = 5 * 1024 * 1024, accept: String = "application/atom+xml, application/rss+xml, application/xml, text/xml, text/html;q=0.8, */*;q=0.5"): Page {
         val builder = Request.Builder().url(normalize(url))
             .header("User-Agent", "Arrrr/0.2 RSS Reader")
-            .header("Accept", "application/atom+xml, application/rss+xml, application/xml, text/xml, text/html;q=0.8, */*;q=0.5")
+            .header("Accept", accept)
         if (etag.isNotBlank()) builder.header("If-None-Match", etag)
         if (modified.isNotBlank()) builder.header("If-Modified-Since", modified)
         val response = http.newCall(builder.build()).await()

@@ -7,7 +7,7 @@ import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 
 /** All calls are serialized by ReaderRepository and run on Dispatchers.IO. */
-class ReaderDatabase(context: Context, name: String = "reader.db") : SQLiteOpenHelper(context, name, null, 1) {
+class ReaderDatabase(context: Context, name: String = "reader.db") : SQLiteOpenHelper(context, name, null, 2) {
     override fun onConfigure(db: SQLiteDatabase) { db.setForeignKeyConstraintsEnabled(true) }
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL("""CREATE TABLE feeds (
@@ -24,10 +24,12 @@ class ReaderDatabase(context: Context, name: String = "reader.db") : SQLiteOpenH
             saved INTEGER NOT NULL DEFAULT 0, saved_at INTEGER NOT NULL DEFAULT 0)""")
         db.execSQL("CREATE INDEX article_feed ON articles(source_id, published_at DESC)")
         db.execSQL("CREATE INDEX article_saved ON articles(saved, saved_at DESC)")
+        db.execSQL("""CREATE TABLE article_fulltext (article_id TEXT PRIMARY KEY NOT NULL REFERENCES articles(id) ON DELETE CASCADE, html TEXT NOT NULL, fetched_at INTEGER NOT NULL)""")
     }
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        // Versioned migrations must be added before increasing the schema version.
-        check(oldVersion == newVersion) { "Missing database migration: $oldVersion -> $newVersion" }
+        if (oldVersion == 1 && newVersion == 2) {
+            db.execSQL("""CREATE TABLE article_fulltext (article_id TEXT PRIMARY KEY NOT NULL REFERENCES articles(id) ON DELETE CASCADE, html TEXT NOT NULL, fetched_at INTEGER NOT NULL)""")
+        } else error("Missing database migration: $oldVersion -> $newVersion")
     }
     fun snapshot(): LibrarySnapshot {
         val feeds = readableDatabase.rawQuery("SELECT * FROM feeds ORDER BY name COLLATE NOCASE", null).use { c ->
@@ -59,6 +61,18 @@ class ReaderDatabase(context: Context, name: String = "reader.db") : SQLiteOpenH
             db.setTransactionSuccessful()
         } finally { db.endTransaction() }
     }
+    /** Read on demand to avoid loading all full HTML into the article list. */
+    fun fullContent(id: String): String? = readableDatabase.rawQuery(
+        "SELECT html FROM article_fulltext WHERE article_id=?", arrayOf(id)
+    ).use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else null }
+
+    fun saveFullContent(id: String, html: String) {
+        require(html.length <= 300_000) { "원문 저장 제한을 초과했습니다." }
+        writableDatabase.insertWithOnConflict("article_fulltext", null, ContentValues().apply {
+            put("article_id", id); put("html", html); put("fetched_at", System.currentTimeMillis())
+        }, SQLiteDatabase.CONFLICT_REPLACE)
+    }
+
     fun markRead(id: String) {
         writableDatabase.update("articles", ContentValues().apply { put("is_read", 1) }, "id=?", arrayOf(id))
     }

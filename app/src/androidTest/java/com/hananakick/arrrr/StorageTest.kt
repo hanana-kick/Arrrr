@@ -18,14 +18,19 @@ class StorageTest {
         ReaderDatabase(context,name).use { db ->
             db.put(feed,listOf(a))
             db.setSaved(a.id,true);db.markRead(a.id)
+            db.saveFullContent(a.id, "<p>Full article text</p>")
             db.put(feed,listOf(a.copy(title="Updated")))
             val item=db.snapshot().articles.single()
             assertTrue(item.saved);assertTrue(item.read);assertEquals("Updated",item.title)
+            assertEquals("<p>Full article text</p>", db.fullContent(a.id))
             db.unsubscribe(feed.id)
             assertTrue(db.snapshot().subscriptions.isEmpty())
             assertTrue(db.snapshot().articles.single().saved)
         }
-        ReaderDatabase(context,name).use { db -> assertTrue(db.snapshot().articles.single().saved) }
+        ReaderDatabase(context,name).use { db ->
+            assertTrue(db.snapshot().articles.single().saved)
+            assertEquals("<p>Full article text</p>", db.fullContent(a.id))
+        }
         context.deleteDatabase(name)
     }
 }

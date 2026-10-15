@@ -2,15 +2,12 @@
 
 Kotlin / Jetpack Compose Material 3 Expressive 기반 RSS·Atom 리더. [승인된 Doop 디자인](https://doop.design/c/6DyH2NjWm7)을 네이티브 Compose로 구현합니다. HTML 목업이나 WebView를 앱 UI로 넣지 않습니다.
 
-## 0.3 읽기 흐름
+## 0.3.2 읽기 흐름
 
-- 전역 내비게이션은 **읽을거리 · 구독 · 설정**입니다. 저장한 글은 필터에서 읽음 상태·출처·정렬·검색과 조합합니다.
-- 큰 제목과 필터 조건은 목록과 함께 스크롤합니다. 낮은 창에서는 큰 제목을 생략합니다. LazyColumn으로 보이는 항목만 구성하며 목록은 30개씩 추가 표시합니다.
-- 작은 창의 글은 부분 시트로 열립니다. 위로 스크롤하면 시트가 먼저 전체 화면을 채운 뒤 본문이 스크롤됩니다.
-- 글 끝에서 직접 더 당기면 현재 장과 다음 장이 분리되고 다음 제목과 본문 일부가 아래에서 올라옵니다. 충분히 당겨 놓으면 전환하고, 짧게 당기면 복귀합니다. 이전 글의 읽던 위치도 복원합니다.
-- 넓은 창에서는 목록과 본문을 나란히 배치하고, 같은 전환을 오른쪽 읽기 카드 안에서 실행합니다. 기기 모델명이나 물리 해상도를 하드코딩하지 않습니다.
-- 저장 / 읽기 테마 / 공유 툴바는 본문 위에 떠 있습니다. 읽기 테마는 앱 테마와 별도로 저장되며 앱/라이트/종이/다크와 글꼴·크기·줄 간격을 조절합니다.
-- 배경과 스크롤 영역은 edge-to-edge, 조작은 시스템바·제스처·컷아웃의 안전 영역을 사용합니다.
+- 읽을거리·구독·설정의 세 목적지. 저장한 글은 읽을거리 필터로 봅니다.
+- 좁은 창은 전체 기사 페이지로 이동하며, 넓은 창은 목록 옆에 기사 페이지를 표시합니다. 읽기 시트와 탄성 넘김은 사용하지 않습니다.
+- 기사 본문은 RSS 내용 또는 원문 웹페이지에서 추출한 공개 본문·이미지를 표시하고, 추출 성공 시 기기에 저장합니다. 추출 불가 시 RSS 내용과 원문 열기를 제공합니다.
+- 저장·읽기 테마·공유 플로팅 툴바, 큰/작은 제목 전환, 명시적 이전/다음 이동과 읽던 위치 복원.
 
 ## 수집과 저장
 
@@ -35,10 +32,10 @@ JDK 17, Android SDK Platform 37.0, Build Tools 36.0.0:
 
 `main`의 GitHub Actions가 단위 테스트·lint·빌드와 API 35의 compact/wide/short UI·SQLite 테스트를 실행합니다. 성공 후 [Releases](https://github.com/hanana-kick/Arrrr/releases)에 **설치 가능한 debug 서명 프리뷰 APK**, SHA-256, 네이티브 스크린샷 ZIP을 올립니다. production/Play 서명은 구성하지 않았습니다.
 
-0.3은 applicationId와 DB schema를 유지하며 versionCode는 3입니다. CI는 이전 0.2.0 APK와 서명 인증서가 같은지 검사하여 업데이트 호환성이 끊긴 APK를 배포하지 않습니다. 첫 실행은 빈 구독 목록이며 테스트 기사는 androidTest에만 포함됩니다.
+0.3.2는 동일한 applicationId를 유지하고 DB 스키마만 v1에서 v2로 마이그레이션하며 versionCode는 5입니다. CI는 이전 0.2.0 APK와 서명 인증서가 같은지 검사하여 업데이트 호환성이 끊긴 APK를 배포하지 않습니다. 첫 실행은 빈 구독 목록이며 테스트 기사는 androidTest에만 포함됩니다.
 
 ## 구조
 
-`data/`: SQLite·DataStore / `network/`: HTTP·안전한 RSS·Atom 파서 / `sync/`: WorkManager / `ui/`: 통합 필터·목록·읽기 Surface·구독·설정 / `ui/theme/`: Material Expressive ColorScheme.
+`data/`: SQLite·DataStore / `network/`: HTTP·안전한 RSS·Atom 파서 / `sync/`: WorkManager / `ui/`: 통합 필터·목록·기사 페이지·구독·설정 / `ui/theme/`: Material Expressive ColorScheme.
 
 [디자인 대응](docs/DESIGN.md) · [릴리즈 노트](docs/RELEASE_NOTES.md) · [아이콘 라이선스](THIRD_PARTY_NOTICES.md)

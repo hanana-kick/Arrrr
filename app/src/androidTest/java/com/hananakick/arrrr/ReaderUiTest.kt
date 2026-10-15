@@ -59,6 +59,9 @@ class ReaderUiTest {
                 ))
                 db.put(tech, listOf(Article("fixture2", "tech", "작고 빠른 앱을 만드는 생각의 순서", "https://example.org/2", "기다리는 순간을 먼저 살펴보기.", longBody, now - 3600000, saved = true, savedAt = now)))
                 db.put(life, listOf(Article("fixture3", "life", "아침에 읽는 다섯 분의 가치", "https://example.org/3", "하루의 작은 쉼표.", longBody, now - 5400000)))
+                // Full content fixtures are stored locally, so UI tests never call example.org.
+                val full = (1..12).joinToString("\n") { i -> "<p>원문 전체 본문 ${i}번째 문단. 글의 모든 단락을 빠짐없이 보존합니다. 긴 글을 읽더라도 이전 위치를 복원합니다.</p>" }
+                listOf("fixture1", "fixture2", "fixture3", "fixture4").forEach { db.saveFullContent(it, full) }
             }
             app.repository.load()
         }
@@ -79,13 +82,10 @@ class ReaderUiTest {
         compose.onNodeWithTag("article_fixture1").performClick()
         compose.onNodeWithTag("reader-title").assertTextEquals("좋은 인터페이스는 무엇을 덜어내는가")
         screenshot("reading-open")
-        if (layout != "wide") {
-            compose.onNodeWithTag("reader-scroll").performTouchInput {
-                swipe(Offset(width * .85f, height * .8f), Offset(width * .85f, height * .18f), 600)
-            }
-            compose.waitForIdle()
-            compose.onNodeWithTag("reader-motion").assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "expanded"))
-        }
+        compose.onNodeWithTag("reader-page").assertExists()
+        compose.onAllNodesWithTag("reader-motion").assertCountEquals(0)
+        compose.onAllNodesWithTag("sheet-handle").assertCountEquals(0)
+        compose.waitUntil(10000) { compose.onAllNodesWithText("원문 전체 본문 1번째 문단.", substring = true).fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("reader-bookmark").performClick()
         compose.waitUntil(10000) { app.repository.library.value.articles.first { it.id == "fixture1" }.saved }
         compose.onNodeWithTag("reader-appearance").performClick()
@@ -129,32 +129,29 @@ class ReaderUiTest {
         assertEquals("paper", runBlocking { ReadingPreferences(app).theme.first() })
     }
 
-    @Test fun directEndDragTurnsToNextAndPreviousRestoresPosition() {
+    @Test fun dedicatedPageFullArticleNextPreviousAndPosition() {
         compose.onNodeWithTag("article_fixture1").performClick()
-        if (layout != "wide") {
-            compose.onNodeWithTag("reader-scroll").performTouchInput {
-                swipe(Offset(width * .85f, height * .8f), Offset(width * .85f, height * .16f), 600)
-            }
-            compose.waitForIdle()
+        compose.onNodeWithTag("reader-page").assertExists()
+        compose.waitUntil(10000) {
+            compose.onAllNodesWithText("원문 전체 본문 1번째 문단.", substring = true).fetchSemanticsNodes().isNotEmpty()
         }
-        // First article: title, source, summary, 12 paragraphs, original, end = 17 items.
-        compose.onNodeWithTag("reader-scroll").performScrollToIndex(16)
+        compose.onNodeWithTag("reader-scroll").performScrollToIndex(14)
         compose.waitForIdle()
-        screenshot("article-end")
-        compose.onNodeWithTag("reader-scroll").performTouchInput {
-            swipe(Offset(width * .9f, height * .82f), Offset(width * .9f, height * .12f), 800)
-        }
+        screenshot("full-article-end")
+        compose.onNodeWithTag("next-article").assertIsDisplayed().performClick()
         compose.waitUntil(10000) {
             compose.onAllNodesWithTag("reader-title").fetchSemanticsNodes().any {
-                it.config.getOrElse(SemanticsProperties.Text) { emptyList() }.any { text -> text.text == "작고 빠른 앱을 만드는 생각의 순서" }
+                it.config.getOrElse(SemanticsProperties.Text) { emptyList() }.any { value -> value.text == "작고 빠른 앱을 만드는 생각의 순서" }
             }
         }
-        screenshot("after-next")
-        compose.onNodeWithTag("previous-article").performClick()
-        compose.waitForIdle()
-        compose.onNodeWithTag("reader-end").assertExists()
+        compose.onNodeWithContentDescription("읽기 메뉴").performClick()
+        compose.onNodeWithText("이전 글").performClick()
+        compose.waitUntil(10000) {
+            compose.onAllNodesWithTag("collapsed-reader-title").fetchSemanticsNodes().isNotEmpty()
+        }
         compose.onNodeWithTag("collapsed-reader-title").assertTextEquals("좋은 인터페이스는 무엇을 덜어내는가")
-        screenshot("previous-position-restored")
+        compose.onAllNodesWithTag("reader-motion").assertCountEquals(0)
+        screenshot("full-article-position-restored")
     }
 
     private fun awaitChecked(tag: String) {

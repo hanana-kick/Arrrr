@@ -44,6 +44,7 @@ private val positionsSaver = mapSaver(
 @Composable
 fun ArticleWorkspace(
     library: LibrarySnapshot, settings: ReaderSettings, readingTheme: String,
+    fullContent: Map<String, FullContentState>, onLoadFull: (Article, Boolean) -> Unit,
     onSettingsChange: ((ReaderSettings) -> ReaderSettings) -> Unit, onReadingTheme: (String) -> Unit,
     sourceFilter: String?, bottomNavigation: Boolean, refreshing: Boolean,
     onRefresh: () -> Unit, onMarkRead: (String) -> Unit, onSave: (String, Boolean) -> Unit,
@@ -58,7 +59,6 @@ fun ArticleWorkspace(
     var searching by rememberSaveable { mutableStateOf(false) }
     var filtersOpen by rememberSaveable { mutableStateOf(false) }
     var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
-    var sessionSerial by rememberSaveable { mutableIntStateOf(0) }
     val queue = remember { mutableStateListOf<String>() }
     val positions = rememberSaveable(saver = positionsSaver) { mutableStateMapOf<String, ReadingPosition>() }
     val listState = rememberLazyListState()
@@ -83,7 +83,7 @@ fun ArticleWorkspace(
     fun select(article: Article) {
         queue.clear(); queue.addAll(articles.map { it.id })
         if (article.id !in queue) queue.add(0, article.id)
-        selectedId = article.id; sessionSerial++; onMarkRead(article.id)
+        selectedId = article.id; onMarkRead(article.id)
     }
     SideEffect { onDetailVisibility(selected != null) }
     BackHandler(enabled = selected != null && !filtersOpen) { closeReader() }
@@ -162,13 +162,14 @@ fun ArticleWorkspace(
             if (selected == null) EmptyContent("읽을 글을 선택하세요", "선택한 글이 이곳에 표시됩니다.", modifier = Modifier.statusBarsPadding().padding(top = 32.dp))
             else {
                 val liveQueue = queue.filter { it in byId }
-                val previous = ReadingMotion.next(liveQueue, selected.id, -1)?.let(byId::get)
-                val next = ReadingMotion.next(liveQueue, selected.id, 1)?.let(byId::get)
-                PaperReader(article = selected, source = sources[selected.sourceId], previous = previous, next = next,
-                    sources = sources, settings = settings, readingTheme = readingTheme,
+                val previous = ReadingQueue.next(liveQueue, selected.id, -1)?.let(byId::get)
+                val next = ReadingQueue.next(liveQueue, selected.id, 1)?.let(byId::get)
+                LaunchedEffect(selected.id) { onLoadFull(selected, false) }
+                ArticlePage(article = selected, source = sources[selected.sourceId], previous = previous, next = next,
+                    settings = settings, readingTheme = readingTheme, content = fullContent[selected.id],
                     onSettingsChange = onSettingsChange, onReadingTheme = onReadingTheme,
-                    isCard = dual, shortWindow = shortWindow, openingSerial = sessionSerial, positions = positions,
-                    onClose = ::closeReader, onSave = { onSave(selected.id, it) },
+                    isSplit = dual, positions = positions, onClose = ::closeReader,
+                    onReload = { onLoadFull(selected, true) }, onSave = { onSave(selected.id, it) },
                     onNavigate = { id -> selectedId = id; onMarkRead(id) })
             }
         }
@@ -178,11 +179,7 @@ fun ArticleWorkspace(
                 detailPane = { AnimatedPane { detailContent() } })
         } else {
             Box(Modifier.fillMaxSize().testTag("workspace-single")) {
-                Box(if (selected != null) Modifier.fillMaxSize().clearAndSetSemantics { } else Modifier.fillMaxSize()) { listContent() }
-                if (selected != null) {
-                    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.scrim.copy(alpha = .32f)).clickable(onClick = ::closeReader).clearAndSetSemantics { })
-                    detailContent()
-                }
+                if (selected == null) listContent() else detailContent()
             }
         }
     }
