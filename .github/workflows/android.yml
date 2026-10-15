@@ -137,11 +137,18 @@ jobs:
         run: |
           set -euo pipefail
           tag="preview-${GITHUB_SHA:0:7}"
-          cp apk/app-debug.apk Arrrr-0.3.2-preview.apk
-          sha256sum Arrrr-0.3.1-preview.apk > SHA256SUMS.txt
-          find test-evidence -path '*/ui-screenshots/*.png' -print | zip -@ native-screenshots.zip
+          apk_name="Arrrr-0.3.2-preview.apk"
+          cp apk/app-debug.apk "$apk_name"
+          sha256sum "$apk_name" > SHA256SUMS.txt
+          for layout in compact wide short; do
+            dir="test-evidence/native-ui-$layout/ui-screenshots"
+            test -d "$dir" && find "$dir" -type f -name '*.png' -print -quit | grep -q . || {
+              echo "Missing native screenshots for $layout"; exit 1;
+            }
+          done
+          find test-evidence -type f -path '*/ui-screenshots/*.png' -print | zip -@ native-screenshots.zip
           if ! gh release view "$tag" >/dev/null 2>&1; then
-            gh release create "$tag" Arrrr-0.3.1-preview.apk SHA256SUMS.txt native-screenshots.zip \
+            gh release create "$tag" "$apk_name" SHA256SUMS.txt native-screenshots.zip \
               --target "$GITHUB_SHA" --prerelease --title "Arrrr 0.3.2 preview (${GITHUB_SHA:0:7})" \
               --notes-file docs/RELEASE_NOTES.md
           fi
