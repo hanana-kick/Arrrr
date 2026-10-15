@@ -2,7 +2,9 @@
 
 Kotlin / Jetpack Compose Material 3 Expressive 기반 RSS·Atom 리더. [승인된 Doop 디자인](https://doop.design/c/6DyH2NjWm7)을 네이티브 Compose로 구현합니다. HTML 목업이나 WebView를 앱 UI로 넣지 않습니다.
 
-## 0.3.2 읽기 흐름
+## 0.3.3 읽기 흐름
+
+- 긱뉴스 Atom `content` 및 RSS `content:encoded` 본문은 HTML 구조를 보존해 직접 읽습니다. 목록·링크·이미지·강조를 안전하게 지원하며, 원문이 요약뿐일 때만 웹페이지 추출을 시도합니다.
 
 - 읽을거리·구독·설정의 세 목적지. 저장한 글은 읽을거리 필터로 봅니다.
 - 좁은 창은 전체 기사 페이지로 이동하며, 넓은 창은 목록 옆에 기사 페이지를 표시합니다. 읽기 시트와 탄성 넘김은 사용하지 않습니다.
@@ -32,7 +34,7 @@ JDK 17, Android SDK Platform 37.0, Build Tools 36.0.0:
 
 `main`의 GitHub Actions가 단위 테스트·lint·빌드와 API 35의 compact/wide/short UI·SQLite 테스트를 실행합니다. 성공 후 [Releases](https://github.com/hanana-kick/Arrrr/releases)에 **설치 가능한 debug 서명 프리뷰 APK**, SHA-256, 네이티브 스크린샷 ZIP을 올립니다. production/Play 서명은 구성하지 않았습니다.
 
-0.3.2는 동일한 applicationId를 유지하고 DB 스키마만 v1에서 v2로 마이그레이션하며 versionCode는 5입니다. CI는 이전 0.2.0 APK와 서명 인증서가 같은지 검사하여 업데이트 호환성이 끊긴 APK를 배포하지 않습니다. 첫 실행은 빈 구독 목록이며 테스트 기사는 androidTest에만 포함됩니다.
+0.3.3은 동일한 applicationId를 유지하고 DB 스키마 v1/v2를 v3로 올리며 versionCode는 6입니다. 기존 구독·읽음·북마크와 원문 캐시는 삭제하지 않습니다. CI는 이전 0.2.0 APK와 서명 인증서가 같은지 검사하여 업데이트 호환성이 끊긴 APK를 배포하지 않습니다. 첫 실행은 빈 구독 목록이며 테스트 기사는 androidTest에만 포함됩니다.
 
 ## 구조
 

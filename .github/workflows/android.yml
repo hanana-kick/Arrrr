@@ -137,7 +137,7 @@ jobs:
         run: |
           set -euo pipefail
           tag="preview-${GITHUB_SHA:0:7}"
-          apk_name="Arrrr-0.3.2-preview.apk"
+          apk_name="Arrrr-0.3.3-preview.apk"
           cp apk/app-debug.apk "$apk_name"
           sha256sum "$apk_name" > SHA256SUMS.txt
           for layout in compact wide short; do
@@ -149,6 +149,6 @@ jobs:
           find test-evidence -type f -path '*/ui-screenshots/*.png' -print | zip -@ native-screenshots.zip
           if ! gh release view "$tag" >/dev/null 2>&1; then
             gh release create "$tag" "$apk_name" SHA256SUMS.txt native-screenshots.zip \
-              --target "$GITHUB_SHA" --prerelease --title "Arrrr 0.3.2 preview (${GITHUB_SHA:0:7})" \
+              --target "$GITHUB_SHA" --prerelease --title "Arrrr 0.3.3 preview (${GITHUB_SHA:0:7})" \
               --notes-file docs/RELEASE_NOTES.md
           fi
