@@ -355,7 +355,7 @@ internal fun PaperReader(
                                     }
                                 }
                                 TopAppBar(windowInsets = WindowInsets(0, 0, 0, 0),
-                                    colors = TopAppBarDefaults.topAppBarColors(containerColor = if (collapsed) palette.surface else Color.Transparent),
+                                    colors = collapsingHeaderColors(collapsed, palette.surface),
                                     title = { if (collapsed) Text(article.title, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.testTag("collapsed-reader-title")) },
                                     navigationIcon = { if (!isCard) IconButton(onClick = currentClose, modifier = Modifier.testTag("reader-back")) { Glyph(R.drawable.ic_back, "읽기 닫기") } },
                                     actions = {

@@ -149,7 +149,7 @@ fun ArticleWorkspace(
                 TopAppBar(title = { Text("읽을거리", maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.alpha(if (collapsed) 1f else 0f)) },
                     modifier = Modifier.align(Alignment.TopCenter),
                     windowInsets = WindowInsets.statusBars.only(WindowInsetsSides.Top),
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = if (collapsed) MaterialTheme.colorScheme.surface else Color.Transparent),
+                    colors = collapsingHeaderColors(collapsed),
                     actions = {
                         IconButton(onClick = { searching = !searching; if (!searching) query = "" }) { Glyph(R.drawable.ic_search, "검색") }
                         IconButton(onClick = { filtersOpen = true }, modifier = Modifier.testTag("open-filters")) {
