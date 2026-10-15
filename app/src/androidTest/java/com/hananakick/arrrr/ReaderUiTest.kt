@@ -3,6 +3,7 @@ package com.hananakick.arrrr
 import android.graphics.Bitmap
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -104,11 +105,13 @@ class ReaderUiTest {
         compose.onNodeWithTag("nav_SETTINGS").performClick()
         compose.onNodeWithTag("settings_THEME").performClick()
         // A semantic node can exist outside a short viewport. Scroll it into view
-        // before sending an actual tap, and verify the selected state immediately.
-        compose.onNodeWithTag("theme-mode_2").performScrollTo().assertIsDisplayed().performClick().assertIsOn()
+        // before sending an actual tap, then await persisted state and its UI update.
+        compose.onNodeWithTag("theme-mode_2").performScrollTo().assertIsDisplayed().performClick()
         compose.waitUntil(10000) { runBlocking { app.settings.flow.first() }.themeMode == "dark" }
-        compose.onNodeWithTag("palette_1").performScrollTo().assertIsDisplayed().performClick().assertIsOn()
+        awaitChecked("theme-mode_2")
+        compose.onNodeWithTag("palette_1").performScrollTo().assertIsDisplayed().performClick()
         compose.waitUntil(10000) { runBlocking { app.settings.flow.first() }.seedColor == 0xFF365F89 }
+        awaitChecked("palette_1")
         if (layout == "wide") {
             compose.onNodeWithTag("settings-preview-side").assertIsDisplayed()
         } else {
@@ -121,7 +124,8 @@ class ReaderUiTest {
         screenshot("settings-dark")
         compose.activityRule.scenario.recreate()
         compose.waitUntil(10000) { compose.onAllNodesWithTag("theme-mode_2").fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithTag("theme-mode_2").performScrollTo().assertIsDisplayed().assertIsOn()
+        compose.onNodeWithTag("theme-mode_2").performScrollTo().assertIsDisplayed()
+        awaitChecked("theme-mode_2")
         assertEquals("paper", runBlocking { ReadingPreferences(app).theme.first() })
     }
 
@@ -151,6 +155,18 @@ class ReaderUiTest {
         compose.onNodeWithTag("reader-end").assertExists()
         compose.onNodeWithTag("collapsed-reader-title").assertTextEquals("좋은 인터페이스는 무엇을 덜어내는가")
         screenshot("previous-position-restored")
+    }
+
+    private fun awaitChecked(tag: String) {
+        // DataStore completes on IO; Compose idleness alone does not await that write
+        // or the subsequent StateFlow collection. Keep both persistence and UI checks.
+        compose.waitUntil(10000) {
+            compose.onAllNodesWithTag(tag).fetchSemanticsNodes().any { node ->
+                node.config.contains(SemanticsProperties.ToggleableState) &&
+                    node.config[SemanticsProperties.ToggleableState] == ToggleableState.On
+            }
+        }
+        compose.onNodeWithTag(tag).assertIsOn()
     }
 
     private fun shell(command: String): String {
