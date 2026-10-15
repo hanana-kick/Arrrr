@@ -71,7 +71,7 @@ object FeedParser {
                     atom && element.getAttribute("type").equals("xhtml", ignoreCase=true) ->
                         element.children().joinToString("") { serializeHtml(it) }
                     atom && element.getAttribute("type").equals("text", ignoreCase=true) ->
-                        Element("p").text(element.textContent).outerHtml()
+                        org.jsoup.nodes.Element("p").text(element.textContent).outerHtml()
                     else -> element.textContent.orEmpty()
                 }
                 FeedHtmlSanitizer.sanitize(html,base)
