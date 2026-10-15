@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.*
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.Lifecycle
@@ -32,7 +33,9 @@ class MainActivity : ComponentActivity() {
             LaunchedEffect(model) {
                 lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) { model.whileVisible() }
             }
-            ArrrrTheme(settings) { ReaderApp(model, settings) }
+            // A background alone does not provide onSurface to Text/Icon descendants.
+            // Native Surface keeps all unqualified content legible after a theme change.
+            ArrrrTheme(settings) { Surface { ReaderApp(model, settings) } }
         }
     }
 }
