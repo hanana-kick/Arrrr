@@ -38,7 +38,7 @@ class ReaderRepository(context: Context, private val database: ReaderDatabase, p
             val existing = if (force) null else withContext(Dispatchers.IO) {
                 synchronized(storageLock) { database.fullContent(article.id) }
             }
-            val html = existing ?: client.fullArticle(article.url, article.body)
+            val html = existing ?: withContext(Dispatchers.IO) { client.fullArticle(article.url, article.body) }
             if (html != null) {
                 if (existing == null) withContext(Dispatchers.IO) {
                     synchronized(storageLock) { database.saveFullContent(article.id, html) }
